@@ -11,7 +11,7 @@ import random
 def log2(n):
     #returns floor of log base 2 of n
     x = 0
-    while    2**x <= n:
+    while 2**x <= n:
         x += 1
     return x-1
 
@@ -42,7 +42,7 @@ def mod_exp(a, n, p):
 
 def is_prime(p):
     #returns True if p is prime
-    if p == 1:
+    if p <= 1:
         return False
     x = 2
     while 1:
@@ -71,37 +71,64 @@ def miller_rabin(p, k=10):
     return True
 
 
-def find_prime(m, n, k=10):
-    #returns a prime between m, n
-    #works quickly up to about 2**57
-    #TO DO: add sieve?
-    while 1:
-        p = random.randint(m, n)
-        if miller_rabin(p,k):
-            return p
+primes = [p for p in range(65000) if is_prime(p)]
 
 
-def find_safe_prime(m, n, k=10):
-    #returns a safe prime between m, n
-    #works quickly up to about 2**52
-    #TO DO: see if polckington method is faster?
-    while 1:
-        p = find_prime(int(m/2), int(n/2), k)
+def sieve(m, n):
+    #returns list of ints between m, n-1 not divisble by a prime below 65000.
+    remaining = list(range(m, n))
+    for p in primes:
+        x = -m % p
+        i = 0
+        while x + i*p < n-m:
+            remaining[x + i*p] = 0
+            i += 1
+    return [x for x in remaining if x != 0]
+
+
+def find_prime_iter(iterable, k=10):
+    #returns a generator which yield primes from iterable
+    for x in iterable:
+        if miller_rabin(x, k):
+            yield x
+
+
+def find_prime(n, presieve=True, length=2**15, k=10):
+    #returns a prime between n, 2*n+2**15
+    #works quickly up to about 2**61
+    r = random.randint(0, n)
+    if presieve:
+        candidates = sieve(n+r, n+r+length)
+    else:
+        candidates = range(n+r, n+r+length)
+    return next(find_prime_iter(candidates, k))
+
+
+def find_safe_prime_iter(iterable, k=10):
+    #returns a generator which yeilds safe primes 2*p+1 for p in iterable
+    for p in find_prime_iter(iterable, k):
         if miller_rabin(2*p + 1):
-            return 2*p + 1
-#    the following is much slower. not sure why.
-#    while 1:
-#        p = find_prime(m, n, k)
-#        if miller_rabin((p-1) / 2, k):
-#            return p
+            yield 2*p + 1
 
 
-def elgamal_key(m, n):
+def find_safe_prime(n, presieve=True, length=2**15, k=10):
+    #returns a safe prime between n, 2*n+2**15
+    #works quickly up to about 2**53
+    N = n//2
+    r = random.randint(0, N)
+    if presieve:
+        candidates = sieve(N+r, N+r+length)
+    else:
+        candidates = range(N+r, N+r+length)
+    return next(find_safe_prime_iter(candidates, k))
+
+
+def elgamal_key(n):
     #returns tuple (q, h, g, x). Let G be the group of quadratic residues
     #mod 2*q + 1. Then (G, q, h, g) is the public key, x is the private key.
-    #q is between m, n.
-    p = find_safe_prime(2*m, 2*n)
-    q = int((p-1) / 2)
+    #q is between n, 2*n+2**15.
+    p = find_safe_prime(2*n)
+    q = (p-1) // 2
     g = 4 #xx or random.randint(1, p-1)**2 % p
     x = random.randint(1, q-1)
     h = mod_exp(g, x, p)
@@ -127,6 +154,3 @@ def elgamal_decrypt(c1, c2, x, q):
     if M > q:
         M = p - M
     return M
-
-
-
