@@ -54,11 +54,11 @@ def is_prime(p):
 
 
 def miller_rabin(p, k=10):
-    #returns True if p is 'probably prime'
+    #returns True if p is 'probably prime', with confidence 1 - 2**(-2*k)
     s = 0
     d = p-1
     while d%2 == 0:
-        d /= 2
+        d //= 2
         s += 1
     for x in range(k):
         a = random.randint(2, p-1)
@@ -94,8 +94,7 @@ def find_prime_iter(iterable, k=10):
 
 
 def find_prime(n, presieve=True, length=2**15, k=10):
-    #returns a prime between n, 2*n+2**15
-    #works quickly up to about 2**61
+    #returns a prime between n, 2*n+length
     r = random.randint(0, n)
     if presieve:
         candidates = sieve(n+r, n+r+length)
@@ -106,15 +105,16 @@ def find_prime(n, presieve=True, length=2**15, k=10):
 
 def find_safe_prime_iter(iterable, k=10):
     #returns a generator which yeilds safe primes 2*p+1 for p in iterable
+    count = 0
     for p in find_prime_iter(iterable, k):
         if miller_rabin(2*p + 1):
             yield 2*p + 1
 
 
 def find_safe_prime(n, presieve=True, length=2**15, k=10):
-    #returns a safe prime between n, 2*n+2**15
-    #works quickly up to about 2**53
-    N = n//2
+    #returns a safe prime between n, 2*n+length
+    #works quickly up to about 2**80
+    N = n // 2
     r = random.randint(0, N)
     if presieve:
         candidates = sieve(N+r, N+r+length)
@@ -154,3 +154,5 @@ def elgamal_decrypt(c1, c2, x, q):
     if M > q:
         M = p - M
     return M
+
+
