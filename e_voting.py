@@ -9,36 +9,19 @@ import random
 import hashlib
 
 
-def log2(n):
-    # Returns floor of log base 2 of n.
-    x = 0
-    while 2**x <= n:
-        x += 1
-    return x - 1
-
-def binary_list(n):
-    # Returns the binary expansion of n as a list.
-    x = [0] * (log2(n)+1)
-    m = n
-    while m != 0:
-        l = log2(m)
-        x[l] = 1
-        m = m - 2**l
-    return x
-
 def mod_exp(a, n, p):
     # Returns a**n % p.
     if n < 0:
         return mod_exp(a, -n * (p-2), p)
-    length = log2(n) + 1
-    bin_n = binary_list(n)
+    length = n.bit_length()
     powers = [0] * length
-    powers[0] = a
+    powers[-1] = a
     for i in range(length-1):
-        powers[i+1] = powers[i]**2 % p
+        powers[-i-2] = powers[-i-1]**2 % p
     x = 1
+    bin_str = format(n, 'b')
     for i in range(length):
-        if bin_n[i]:
+        if bin_str[i] == '1':
             x = x*powers[i] % p
     return x
 
@@ -115,7 +98,6 @@ def find_safe_prime_iter(iterable, k=10):
 
 def find_safe_prime(n, presieve=True, length=2**15, k=10):
     # Returns a safe prime between n, 2*n+length. xx
-    # Works very quickly up to about 2**80.
     N = n // 2
     r = random.randint(0, N)
     if presieve:
@@ -181,3 +163,52 @@ class Commitment:
         # Check the commitment.
         x = mod_exp(self.g, s, self.p)*mod_exp(self.h, t, self.p) % self.p
         return commitment == x
+    
+
+class Hash:
+    
+    def __init__(self):
+        self.h = hashlib.sha256()
+    
+    def update(self, m):
+        self.h.update(m.to_bytes((m.bit_length() + 7) // 8, byteorder='big'))
+    
+    def digest(self):
+        return int(self.h.hexdigest(), 16)
+    
+    @staticmethod
+    def easy_hash(m):
+        h = Hash()
+        h.update(m)
+        return h.digest()
+
+
+class Signature:
+    
+    def __init__(self, p, g, h):
+        self.p, self.g, self.h = p, g, h
+        self.q = p // 2
+        
+    def sign(self, m, x, k=None):
+        if k is None:
+            k = random.randint(1, self.q - 1)
+        r = mod_exp(self.g, k, self.p) % self.q
+        H = Hash.easy_hash(m)
+        s = mod_exp(k, -1, self.q)*(H+x*r) % self.q
+        if r * s == 0:
+            return self.sign(m)
+        else:
+            return (r, s)
+    
+    def check(self, m, r, s):
+        if r <= 0 or r >= self.q or s <= 0 or s >= self.q:
+            return False
+        w = mod_exp(s, -1, self.q)
+        h = hashlib.sha256()
+        h.update(m.to_bytes((m.bit_length() + 7) // 8, byteorder='big'))
+        H = int(h.hexdigest(), 16)
+        u1 = H*w % self.q
+        u2 = r*w % self.q
+        v = mod_exp(self.g, u1, self.p)*mod_exp(self.h, u2, self.p) % self.p \
+            % self.q
+        return v == r
